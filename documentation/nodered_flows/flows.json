@@ -1,0 +1,283 @@
+[
+    {
+        "id": "306dca7a.036ea6",
+        "type": "tab",
+        "label": "Ingress",
+        "disabled": false,
+        "info": "# Ingress Workflow\n\nManages data coming in from the Raspberry Pi (frontend), processes them forwards the to InfluxDB."
+    },
+    {
+        "id": "97fcf15f.3fc36",
+        "type": "json",
+        "z": "306dca7a.036ea6",
+        "name": "To JSON",
+        "property": "payload",
+        "action": "",
+        "pretty": true,
+        "x": 520,
+        "y": 320,
+        "wires": [
+            [
+                "583a5f16.17a0c"
+            ]
+        ]
+    },
+    {
+        "id": "bcfba735.31ee18",
+        "type": "function",
+        "z": "306dca7a.036ea6",
+        "name": "Format for DB",
+        "func": "msg.payload = {\n  location: msg.payload.location.charAt(0).toUpperCase() + msg.payload.location.slice(1),\n  humidity: msg.payload.sensors.s1.moisture,\n  pump: msg.payload.sensors.s1.pump.toString(),\n  time: msg.payload.time\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 1260,
+        "y": 300,
+        "wires": [
+            [
+                "5fd94d3.7ea08b4",
+                "93062683.a29328"
+            ]
+        ]
+    },
+    {
+        "id": "583a5f16.17a0c",
+        "type": "function",
+        "z": "306dca7a.036ea6",
+        "name": "Convert to Range",
+        "func": "msg.payload.sensors.s1.moisture = Math.max(0, Math.min(100,Math.round(100*(msg.payload.sensors.s1.moisture /1800))));\n// msg.payload.sensors.s2.moisture = Math.max(0, Math.min(100,Math.round(100*(msg.payload.sensors.s2.moisture /1800))));\nreturn msg;\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 730,
+        "y": 320,
+        "wires": [
+            [
+                "5713312f.edd9d",
+                "2080b069.e02b3"
+            ]
+        ]
+    },
+    {
+        "id": "342193c2.cf507c",
+        "type": "mqtt in",
+        "z": "306dca7a.036ea6",
+        "name": "Soil Moisture Sensor",
+        "topic": "iot-project",
+        "qos": "0",
+        "datatype": "auto",
+        "broker": "74549ca0.300864",
+        "x": 330,
+        "y": 320,
+        "wires": [
+            [
+                "97fcf15f.3fc36"
+            ]
+        ]
+    },
+    {
+        "id": "a3a5d0f3.d79cd",
+        "type": "link out",
+        "z": "306dca7a.036ea6",
+        "name": "Start Pump 1",
+        "links": [
+            "7c49a689.0eb348"
+        ],
+        "x": 1615,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "2080b069.e02b3",
+        "type": "switch",
+        "z": "306dca7a.036ea6",
+        "name": "Pump == OFF",
+        "property": "payload.sensors.s1.pump",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "false"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 1020,
+        "y": 300,
+        "wires": [
+            [
+                "bcfba735.31ee18"
+            ]
+        ]
+    },
+    {
+        "id": "5713312f.edd9d",
+        "type": "switch",
+        "z": "306dca7a.036ea6",
+        "name": "Pump == ON",
+        "property": "payload.sensors.s1.pump",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "true"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 1010,
+        "y": 340,
+        "wires": [
+            [
+                "739ea2b6.41e5fc"
+            ]
+        ]
+    },
+    {
+        "id": "93062683.a29328",
+        "type": "influxdb out",
+        "z": "306dca7a.036ea6",
+        "influxdb": "4991e1f4.4b327",
+        "name": "InfluxDB",
+        "measurement": "SOIL_MOISTURE_S1",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "organisation",
+        "bucket": "bucket",
+        "x": 1480,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "5fd94d3.7ea08b4",
+        "type": "switch",
+        "z": "306dca7a.036ea6",
+        "name": "< 15",
+        "property": "payload.humidity",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "lt",
+                "v": "15",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 1470,
+        "y": 260,
+        "wires": [
+            [
+                "a3a5d0f3.d79cd"
+            ]
+        ]
+    },
+    {
+        "id": "9add9c8.bf0be6",
+        "type": "switch",
+        "z": "306dca7a.036ea6",
+        "name": "> 95",
+        "property": "payload.humidity",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "gt",
+                "v": "95",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 1470,
+        "y": 380,
+        "wires": [
+            [
+                "61ed7fbe.2a022"
+            ]
+        ]
+    },
+    {
+        "id": "61ed7fbe.2a022",
+        "type": "link out",
+        "z": "306dca7a.036ea6",
+        "name": "Stop Pump 1",
+        "links": [
+            "603a614c.1a214"
+        ],
+        "x": 1615,
+        "y": 380,
+        "wires": []
+    },
+    {
+        "id": "739ea2b6.41e5fc",
+        "type": "function",
+        "z": "306dca7a.036ea6",
+        "name": "Format for DB",
+        "func": "msg.payload = {\n  location: msg.payload.location.charAt(0).toUpperCase() + msg.payload.location.slice(1),\n  humidity: msg.payload.sensors.s1.moisture,\n  pump: msg.payload.sensors.s1.pump.toString(),\n  time: msg.payload.time\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 1260,
+        "y": 340,
+        "wires": [
+            [
+                "93062683.a29328",
+                "9add9c8.bf0be6"
+            ]
+        ]
+    },
+    {
+        "id": "c5097a95.5c9798",
+        "type": "comment",
+        "z": "306dca7a.036ea6",
+        "name": "Plant 1",
+        "info": "",
+        "x": 990,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "74549ca0.300864",
+        "type": "mqtt-broker",
+        "name": "mosquitto",
+        "broker": "mosquitto",
+        "port": "1883",
+        "tls": "",
+        "clientid": "node-red",
+        "usetls": false,
+        "compatmode": false,
+        "keepalive": "60",
+        "cleansession": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "closeTopic": "",
+        "closeQos": "0",
+        "closePayload": "",
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": ""
+    },
+    {
+        "id": "4991e1f4.4b327",
+        "type": "influxdb",
+        "hostname": "influxdb",
+        "port": "8086",
+        "protocol": "http",
+        "database": "AUTONOMOUS_GARDENER",
+        "name": "InfluxDB",
+        "usetls": false,
+        "tls": "",
+        "influxdbVersion": "1.x",
+        "url": "http://localhost:8086",
+        "rejectUnauthorized": true
+    }
+]

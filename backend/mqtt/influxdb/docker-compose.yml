@@ -1,0 +1,28 @@
+version: '3.7'
+
+services:
+  influxdb:
+    image: influxdb:latest
+    volumes:
+      - ./data:/var/lib/influxdb
+    networks:
+      - inbound
+    environment:
+      - INFLUXDB_DB=AUTONOMOUS_GARDENER
+      - INFLUXDB_ADMIN_USER=admin
+      - INFLUXDB_ADMIN_PASSWORD=iotproject
+      - INFLUXDB_PRECISION=s
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 20s
+      labels:
+        - "traefik.enable=true"
+        - "traefik.backend=influx"
+        - "traefik.docker.network=inbound"
+
+networks:
+  inbound:
+    external: true

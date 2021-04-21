@@ -1,0 +1,128 @@
+version: '3.7'
+
+services:
+  traefik:
+    image: "traefik:v2.3"
+    command:
+      - "--log.level=DEBUG"
+      - "--api.insecure=false"
+      - "--api=true"
+      - "--api.dashboard=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # - "--entrypoints.websocket.address=:8443"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--providers.docker.exposedByDefault=false"
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
+      - "--metrics.prometheus.entryPoint=websecure"
+      - "--metrics.prometheus.addServicesLabels=true"
+      - "--metrics.prometheus.manualrouting=true"
+      - "--providers.docker=true"
+      - "--providers.docker.swarmmode=true"
+      - "--providers.docker.watch"
+    networks:
+      - traefik
+      - inbound
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - target: 80
+        published: 80
+        mode: host
+      - target: 443
+        published: 443
+        mode: host
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.api.rule=Host(`traefik.autonomous-gardener.tech`)"
+        - "traefik.http.routers.api.entrypoints=websecure"
+        - "traefik.http.routers.api.tls=true"
+        - "traefik.http.routers.api.middlewares=auth"
+        - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$TrnyLg30$$HdxodO471C3O.3xh3x5eX/"
+        - "traefik.http.routers.api.service=api@internal"
+        - "traefik.http.services.dummy-svc.loadbalancer.server.port=9999"
+        - "traefik.http.routers.metrics.service=prometheus@internal"
+        - "traefik.http.routers.metrics.entrypoints=websecure"
+        - "traefik.http.routers.metrics.rule=Host(`traefik.autonomous-gardener.tech`) && Path(`/metrics`)"
+        - "traefik.http.routers.metrics.tls=true"
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - inbound
+    deploy:
+      labels:
+       - "traefik.enable=true"
+       - "traefik.http.routers.prometheus.rule=Host(`prometheus.autonomous-gardener.tech`)"
+       - "traefik.http.routers.prometheus.entrypoints=websecure"
+       - "traefik.http.routers.prometheus.service=prometheus"
+       - "traefik.http.routers.prometheus.middlewares=auth"
+       - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+       - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$TrnyLg30$$HdxodO471C3O.3xh3x5eX/"
+       - "traefik.http.routers.prometheus.tls=true"
+       - "traefik.docker.network=inbound"
+      placement:
+        constraints:
+        - node.role==manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 20s
+  grafana:
+    image: grafana/grafana
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    env_file:
+      - ./grafana/config.monitoring
+    networks:
+      - inbound
+    user: "104"
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.grafana.rule=Host(`grafana.autonomous-gardener.tech`)"
+        - "traefik.http.routers.grafana.entrypoints=websecure"
+        - "traefik.http.routers.grafana.service=grafana"
+        - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+        - "traefik.docker.network=inbound"
+        - "traefik.http.routers.grafana.tls=true"
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+networks:
+  traefik:
+    driver: overlay
+    name: traefik
+  inbound:
+    driver: overlay
+    name: inbound
+volumes:
+    prometheus_data:
+      external: true
+    grafana_data:
+      external: true

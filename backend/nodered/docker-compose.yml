@@ -1,0 +1,29 @@
+version: '3.7'
+
+services:
+  nodered:
+    image: nodered/node-red
+    volumes:
+      - ./data:/data
+      - ./certs:/home/pi/.node-red/certs
+    networks:
+      - inbound
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 20s
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=inbound"
+        - "traefik.http.routers.nodered.rule=Host(`nodered.autonomous-gardener.tech`)"
+        - "traefik.http.routers.nodered.entrypoints=websecure"
+        - "traefik.http.routers.nodered.tls=true"
+        - "traefik.http.services.nodered.loadbalancer.server.port=1880"
+        - "traefik.http.routers.nodered.middlewares=auth"
+        - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$TrnyLg30$$HdxodO471C3O.3xh3x5eX/"
+
+networks:
+  inbound:
+    external: true

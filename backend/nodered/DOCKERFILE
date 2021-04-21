@@ -1,0 +1,9 @@
+FROM nodered/node-red:latest
+
+WORKDIR /data/
+
+COPY run.sh .
+
+RUN ./run.sh
+
+ENTRYPOINT ["npm" "--no-update-notifier" "--no-fund" "start" "--cache" "/data/.npm" "--" "--userDir" "/data"]

@@ -1,0 +1,35 @@
+version: '3.7'
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    environment:
+      - MQTT_USERNAME=fhnw
+      - MQTT_PASSWORD=iotproject20
+    networks:
+      - inbound
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./data/mosquitto.db:/mosquitto/data/mosquitto.db
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 20s
+      labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.mqtt.rule=Host(`mqtt.autonomous-gardener.tech`)"
+      - "traefik.http.routers.mqtt.entrypoints=websecure"
+      - "traefik.http.routers.mqtt.tls=true"
+      - "traefik.http.services.mqtt.loadbalancer.server.port=9001"
+
+      # - "traefik.tcp.routers.mqtt.rule=HostSNI(`*`)"
+      # - "traefik.tcp.routers.mqtt.tls=true"
+      # - "traefik.tcp.services.mqtt.loadbalancer.server.port=8443"
+      # - "traefik.tcp.routers.mqtt.entrypoints=websocket"
+ 
+networks: 
+  inbound:
+    external: true 
